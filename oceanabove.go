@@ -8,7 +8,11 @@ import (
 
 	"github.com/go-gl/gl/v3.2-core/gl"
 	"github.com/go-gl/glfw/v3.1/glfw"
+	mgl "github.com/go-gl/mathgl/mgl32"
 )
+
+const WindowWidth = 800
+const WindowHeight = 600
 
 func main() {
 	runtime.LockOSThread()
@@ -24,7 +28,7 @@ func main() {
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 
-	window, err := glfw.CreateWindow(800, 600, "Ocean Above", nil, nil)
+	window, err := glfw.CreateWindow(WindowWidth, WindowHeight, "Ocean Above", nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -51,6 +55,20 @@ func main() {
 		panic(err)
 	}
 	gl.UseProgram(program)
+
+	proj := mgl.Perspective(mgl.DegToRad(45.0), float32(WindowWidth)/WindowHeight, 0.1, 10.0)
+	projUniform := gl.GetUniformLocation(program, gl.Str("proj\x00"))
+	gl.UniformMatrix4fv(projUniform, 1, false, &proj[0])
+
+	camera := mgl.Vec3{0, 0, 5}
+	view := mgl.LookAtV(camera, mgl.Vec3{0, 0, 0}, mgl.Vec3{0, 1, 0})
+	viewUniform := gl.GetUniformLocation(program, gl.Str("view\x00"))
+	gl.UniformMatrix4fv(viewUniform, 1, false, &view[0])
+
+	model := mgl.Ident4()
+	model = model.Mul4(mgl.Translate3D(1, 0, 0))
+	modelUniform := gl.GetUniformLocation(program, gl.Str("model\x00"))
+	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 
 	var vao uint32
 	gl.GenVertexArrays(1, &vao)
