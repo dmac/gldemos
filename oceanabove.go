@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"math"
 	"runtime"
 	"strings"
 
@@ -56,17 +57,19 @@ func main() {
 	}
 	gl.UseProgram(program)
 
-	proj := mgl.Perspective(mgl.DegToRad(45.0), float32(WindowWidth)/WindowHeight, 0.1, 10.0)
+	proj := mgl.Perspective(mgl.DegToRad(45.0), float32(WindowWidth)/WindowHeight, 0.1, 100.0)
 	projUniform := gl.GetUniformLocation(program, gl.Str("proj\x00"))
 	gl.UniformMatrix4fv(projUniform, 1, false, &proj[0])
 
 	camera := mgl.Vec3{0, 0, 5}
-	view := mgl.LookAtV(camera, mgl.Vec3{0, 0, 0}, mgl.Vec3{0, 1, 0})
+	camyaw := float32(0)
+	campitch := float32(0)
+	view := viewMatrix(camera, camyaw, campitch)
 	viewUniform := gl.GetUniformLocation(program, gl.Str("view\x00"))
 	gl.UniformMatrix4fv(viewUniform, 1, false, &view[0])
 
 	model := mgl.Ident4()
-	model = model.Mul4(mgl.Translate3D(1, 0, 0))
+	model = model.Mul4(mgl.Translate3D(0, 0, 0))
 	modelUniform := gl.GetUniformLocation(program, gl.Str("model\x00"))
 	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 
@@ -83,14 +86,67 @@ func main() {
 	gl.EnableVertexAttribArray(vattrib)
 	gl.VertexAttribPointer(vattrib, 3, gl.FLOAT, false, 3*4, gl.PtrOffset(0))
 
+	cx, cy := window.GetCursorPos()
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		gl.DrawArrays(gl.TRIANGLES, 0, 3)
 
+		moved := false
+		if window.GetKey(glfw.KeyW) == glfw.Press {
+			camera[0] -= 1 * float32(math.Sin(float64(mgl.DegToRad(camyaw))))
+			camera[2] -= 1 * float32(math.Cos(float64(mgl.DegToRad(camyaw))))
+			moved = true
+		}
+		if window.GetKey(glfw.KeyS) == glfw.Press {
+			camera[0] += 1 * float32(math.Sin(float64(mgl.DegToRad(camyaw))))
+			camera[2] += 1 * float32(math.Cos(float64(mgl.DegToRad(camyaw))))
+			moved = true
+		}
+		if window.GetKey(glfw.KeyA) == glfw.Press {
+			camera[0] -= 1 * float32(math.Sin(float64(mgl.DegToRad(camyaw + 90))))
+			camera[2] -= 1 * float32(math.Cos(float64(mgl.DegToRad(camyaw + 90))))
+			moved = true
+		}
+		if window.GetKey(glfw.KeyD) == glfw.Press {
+			camera[0] += 1 * float32(math.Sin(float64(mgl.DegToRad(camyaw + 90))))
+			camera[2] += 1 * float32(math.Cos(float64(mgl.DegToRad(camyaw + 90))))
+			moved = true
+		}
+
+		cx2, cy2 := window.GetCursorPos()
+		dcx, dcy := float32(cx2-cx), float32(cy2-cy)
+		if dcx != 0 {
+			cx = cx2
+			camyaw -= dcx * 0.5
+			moved = true
+		}
+		if dcy != 0 {
+			cy = cy2
+			campitch -= dcy * 0.5
+			moved = true
+			if campitch > 90 {
+				campitch = 90
+			}
+			if campitch < -90 {
+				campitch = -90
+			}
+		}
+
+		if moved {
+			view := viewMatrix(camera, camyaw, campitch)
+			gl.UniformMatrix4fv(viewUniform, 1, false, &view[0])
+		}
+
 		window.SwapBuffers()
 		glfw.PollEvents()
 	}
+}
+
+func viewMatrix(camera [3]float32, yaw float32, pitch float32) mgl.Mat4 {
+	R := mgl.Rotate3DX(mgl.DegToRad(-pitch)).Mul3(mgl.Rotate3DY(mgl.DegToRad(-yaw))).Mat4()
+	T := mgl.Translate3D(-camera[0], -camera[1], -camera[2])
+	return R.Mul4(T)
 }
 
 func linkProgram(vertexShaderFilename, fragmentShaderFilename string) (uint32, error) {
