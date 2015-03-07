@@ -6,6 +6,7 @@ import (
 	"math"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/go-gl/gl/v3.2-core/gl"
 	"github.com/go-gl/glfw/v3.1/glfw"
@@ -34,22 +35,20 @@ func main() {
 		panic(err)
 	}
 	window.MakeContextCurrent()
+	window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
 
 	if err := gl.Init(); err != nil {
 		panic(err)
 	}
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
+	gl.Enable(gl.CULL_FACE)
+	gl.CullFace(gl.BACK)
+	gl.FrontFace(gl.CCW)
 	gl.ClearColor(0.5, 0.5, 0.5, 1.0)
 
 	fmt.Println(gl.GoStr(gl.GetString(gl.VERSION)))
 	fmt.Println(gl.GoStr(gl.GetString(gl.RENDERER)))
-
-	points := []float32{
-		0, 1, 0,
-		-1, -1, 0,
-		1, -1, 0,
-	}
 
 	program, err := linkProgram("vertex.glsl", "fragment.glsl")
 	if err != nil {
@@ -57,13 +56,22 @@ func main() {
 	}
 	gl.UseProgram(program)
 
+	blocks := []*Block{
+		NewBlock(0, 0, 0, program),
+		NewBlock(-2, 0, 0, program),
+		NewBlock(2, 0, -2, program),
+	}
+	block := NewBlock(0, 0, 0, program)
+	fmt.Printf("%#v\n", block)
+
 	proj := mgl.Perspective(mgl.DegToRad(45.0), float32(WindowWidth)/WindowHeight, 0.1, 100.0)
 	projUniform := gl.GetUniformLocation(program, gl.Str("proj\x00"))
 	gl.UniformMatrix4fv(projUniform, 1, false, &proj[0])
 
-	camera := mgl.Vec3{0, 0, 5}
+	camera := mgl.Vec3{0, 1.5, 5}
 	camyaw := float32(0)
 	campitch := float32(0)
+	speed := float32(10)
 	view := viewMatrix(camera, camyaw, campitch)
 	viewUniform := gl.GetUniformLocation(program, gl.Str("view\x00"))
 	gl.UniformMatrix4fv(viewUniform, 1, false, &view[0])
@@ -73,45 +81,38 @@ func main() {
 	modelUniform := gl.GetUniformLocation(program, gl.Str("model\x00"))
 	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 
-	var vao uint32
-	gl.GenVertexArrays(1, &vao)
-	gl.BindVertexArray(vao)
-
-	var vbo uint32
-	gl.GenBuffers(1, &vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(points)*4, gl.Ptr(points), gl.STATIC_DRAW)
-
-	vattrib := uint32(gl.GetAttribLocation(program, gl.Str("vertex_position\x00")))
-	gl.EnableVertexAttribArray(vattrib)
-	gl.VertexAttribPointer(vattrib, 3, gl.FLOAT, false, 3*4, gl.PtrOffset(0))
-
 	cx, cy := window.GetCursorPos()
+	lastTime := time.Now().UnixNano()
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		gl.DrawArrays(gl.TRIANGLES, 0, 3)
+		currTime := time.Now().UnixNano()
+		dt := float32(currTime-lastTime) / 1e9
+		lastTime = currTime
 
 		moved := false
 		if window.GetKey(glfw.KeyW) == glfw.Press {
-			camera[0] -= 1 * float32(math.Sin(float64(mgl.DegToRad(camyaw))))
-			camera[2] -= 1 * float32(math.Cos(float64(mgl.DegToRad(camyaw))))
+			camera[0] -= dt * speed * float32(math.Sin(float64(mgl.DegToRad(camyaw))))
+			camera[2] -= dt * speed * float32(math.Cos(float64(mgl.DegToRad(camyaw))))
 			moved = true
 		}
 		if window.GetKey(glfw.KeyS) == glfw.Press {
-			camera[0] += 1 * float32(math.Sin(float64(mgl.DegToRad(camyaw))))
-			camera[2] += 1 * float32(math.Cos(float64(mgl.DegToRad(camyaw))))
+			camera[0] += dt * speed * float32(math.Sin(float64(mgl.DegToRad(camyaw))))
+			camera[2] += dt * speed * float32(math.Cos(float64(mgl.DegToRad(camyaw))))
 			moved = true
 		}
 		if window.GetKey(glfw.KeyA) == glfw.Press {
-			camera[0] -= 1 * float32(math.Sin(float64(mgl.DegToRad(camyaw + 90))))
-			camera[2] -= 1 * float32(math.Cos(float64(mgl.DegToRad(camyaw + 90))))
+			camera[0] -= dt * speed * float32(math.Sin(float64(mgl.DegToRad(camyaw+90))))
+			camera[2] -= dt * speed * float32(math.Cos(float64(mgl.DegToRad(camyaw+90))))
 			moved = true
 		}
 		if window.GetKey(glfw.KeyD) == glfw.Press {
-			camera[0] += 1 * float32(math.Sin(float64(mgl.DegToRad(camyaw + 90))))
-			camera[2] += 1 * float32(math.Cos(float64(mgl.DegToRad(camyaw + 90))))
+			camera[0] += dt * speed * float32(math.Sin(float64(mgl.DegToRad(camyaw+90))))
+			camera[2] += dt * speed * float32(math.Cos(float64(mgl.DegToRad(camyaw+90))))
 			moved = true
+		}
+		if window.GetKey(glfw.KeyEscape) == glfw.Press {
+			window.SetShouldClose(true)
 		}
 
 		cx2, cy2 := window.GetCursorPos()
@@ -136,6 +137,11 @@ func main() {
 		if moved {
 			view := viewMatrix(camera, camyaw, campitch)
 			gl.UniformMatrix4fv(viewUniform, 1, false, &view[0])
+		}
+
+		for _, block := range blocks {
+			gl.BindVertexArray(block.vao)
+			gl.DrawArrays(gl.TRIANGLES, 0, 36)
 		}
 
 		window.SwapBuffers()
