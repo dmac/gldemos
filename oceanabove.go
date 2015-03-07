@@ -55,14 +55,14 @@ func main() {
 		panic(err)
 	}
 	gl.UseProgram(program)
+	initBlockBase(program)
 
 	blocks := []*Block{
-		NewBlock(0, 0, 0, program),
-		NewBlock(-2, 0, 0, program),
-		NewBlock(2, 0, -2, program),
+		NewBlock(0, 0, 0),
+		NewBlock(-2, 0, 0),
+		NewBlock(2, 0, -2),
+		NewBlock(0, 3, 0),
 	}
-	block := NewBlock(0, 0, 0, program)
-	fmt.Printf("%#v\n", block)
 
 	proj := mgl.Perspective(mgl.DegToRad(45.0), float32(WindowWidth)/WindowHeight, 0.1, 100.0)
 	projUniform := gl.GetUniformLocation(program, gl.Str("proj\x00"))
@@ -140,8 +140,7 @@ func main() {
 		}
 
 		for _, block := range blocks {
-			gl.BindVertexArray(block.vao)
-			gl.DrawArrays(gl.TRIANGLES, 0, 36)
+			block.Draw()
 		}
 
 		window.SwapBuffers()

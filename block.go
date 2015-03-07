@@ -5,103 +5,118 @@ import (
 	mgl "github.com/go-gl/mathgl/mgl32"
 )
 
-type Block struct {
-	Pos  mgl.Vec3
-	Size float32
+var blockBase BlockBase
 
-	// TODO(dmac) There should likely only be a single, shared instance of the mesh that's transformed
-	// with a model matrix..
-	vao uint32
-}
-
-func NewBlock(x, y, z float32, program uint32) *Block {
-	block := &Block{
-		Pos:  mgl.Vec3{x, y, z},
-		Size: 1,
-	}
-
-	gl.GenVertexArrays(1, &block.vao)
-	gl.BindVertexArray(block.vao)
+func initBlockBase(program uint32) {
+	blockBase = BlockBase{0, program}
+	gl.GenVertexArrays(1, &blockBase.vao)
+	gl.BindVertexArray(blockBase.vao)
 
 	var vbo uint32
 	gl.GenBuffers(1, &vbo)
 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
 
-	mesh := block.genVertexData()
+	mesh := genBlockVertexData(mgl.Vec3{0, 0, 0}, 1)
 	gl.BufferData(gl.ARRAY_BUFFER, len(mesh)*4, gl.Ptr(mesh), gl.STATIC_DRAW)
 
 	vattrib := uint32(gl.GetAttribLocation(program, gl.Str("vertex_position\x00")))
 	gl.EnableVertexAttribArray(vattrib)
 	gl.VertexAttribPointer(vattrib, 3, gl.FLOAT, false, 3*4, gl.PtrOffset(0))
+}
 
+type BlockBase struct {
+	vao     uint32
+	program uint32
+}
+
+type Block struct {
+	BlockBase
+	Pos  mgl.Vec3
+	Size float32
+}
+
+func NewBlock(x, y, z float32) *Block {
+	block := &Block{
+		BlockBase: blockBase,
+		Pos:       mgl.Vec3{x, y, z},
+		Size:      1,
+	}
 	return block
 }
 
-// genVertexData takes an array of points and returns a "mesh" of the block for use in glBufferData.
-func (b *Block) genVertexData() []float32 {
-	ps := b.genPoints()
-	return []float32{
-		// top face
-		ps[1][0], ps[1][1], ps[1][2],
-		ps[2][0], ps[2][1], ps[2][2],
-		ps[3][0], ps[3][1], ps[3][2],
-		ps[3][0], ps[3][1], ps[3][2],
-		ps[0][0], ps[0][1], ps[0][2],
-		ps[1][0], ps[1][1], ps[1][2],
-
-		// bottom face
-		ps[4][0], ps[4][1], ps[4][2],
-		ps[7][0], ps[7][1], ps[7][2],
-		ps[6][0], ps[6][1], ps[6][2],
-		ps[6][0], ps[6][1], ps[6][2],
-		ps[5][0], ps[5][1], ps[5][2],
-		ps[4][0], ps[4][1], ps[4][2],
-
-		// front face
-		ps[0][0], ps[0][1], ps[0][2],
-		ps[3][0], ps[3][1], ps[3][2],
-		ps[7][0], ps[7][1], ps[7][2],
-		ps[7][0], ps[7][1], ps[7][2],
-		ps[4][0], ps[4][1], ps[4][2],
-		ps[0][0], ps[0][1], ps[0][2],
-
-		// back face
-		ps[1][0], ps[1][1], ps[1][2],
-		ps[5][0], ps[5][1], ps[5][2],
-		ps[6][0], ps[6][1], ps[6][2],
-		ps[6][0], ps[6][1], ps[6][2],
-		ps[2][0], ps[2][1], ps[2][2],
-		ps[1][0], ps[1][1], ps[1][2],
-
-		// left face
-		ps[2][0], ps[2][1], ps[2][2],
-		ps[6][0], ps[6][1], ps[6][2],
-		ps[7][0], ps[7][1], ps[7][2],
-		ps[7][0], ps[7][1], ps[7][2],
-		ps[3][0], ps[3][1], ps[3][2],
-		ps[2][0], ps[2][1], ps[2][2],
-
-		// right face
-		ps[0][0], ps[0][1], ps[0][2],
-		ps[4][0], ps[4][1], ps[4][2],
-		ps[5][0], ps[5][1], ps[5][2],
-		ps[5][0], ps[5][1], ps[5][2],
-		ps[1][0], ps[1][1], ps[1][2],
-		ps[0][0], ps[0][1], ps[0][2],
-	}
+// TODO(dmac) Should only update the uniform when necessary (i.e., after movement)
+func (b *Block) Draw() {
+	model := b.genModel()
+	modelUniform := gl.GetUniformLocation(b.program, gl.Str("model\x00"))
+	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+	gl.BindVertexArray(b.vao)
+	gl.DrawArrays(gl.TRIANGLES, 0, 36)
 }
 
-// genPoints calculates the eight corners of b using Pos and Size.
-func (b *Block) genPoints() [8]mgl.Vec3 {
-	halfsize := b.Size / 2
-	center := mgl.Vec3{b.Pos[0], b.Pos[1], b.Pos[2]}
-	v1 := center.Add(mgl.Vec3{halfsize, halfsize, halfsize})
-	v2 := center.Add(mgl.Vec3{halfsize, halfsize, -halfsize})
-	v3 := center.Add(mgl.Vec3{-halfsize, halfsize, -halfsize})
-	v4 := center.Add(mgl.Vec3{-halfsize, halfsize, halfsize})
-	v5 := center.Add(mgl.Vec3{halfsize, -halfsize, halfsize})
-	v6 := center.Add(mgl.Vec3{halfsize, -halfsize, -halfsize})
-	v7 := center.Add(mgl.Vec3{-halfsize, -halfsize, -halfsize})
-	v8 := center.Add(mgl.Vec3{-halfsize, -halfsize, halfsize})
-	return [8]mgl.Vec3{v1, v2, v3, v4, v5, v6, v7, v8}
+// genModel generates a model matrix to be used as a uniform in the shader program.
+func (b *Block) genModel() mgl.Mat4 {
+	T := mgl.Translate3D(b.Pos[0], b.Pos[1], b.Pos[2])
+	return T
+}
+
+// genVertexData takes an array of points and returns a "mesh" of the block for use in glBufferData.
+func genBlockVertexData(center mgl.Vec3, size float32) []float32 {
+	halfsize := size / 2
+	p0 := center.Add(mgl.Vec3{halfsize, halfsize, halfsize})
+	p1 := center.Add(mgl.Vec3{halfsize, halfsize, -halfsize})
+	p2 := center.Add(mgl.Vec3{-halfsize, halfsize, -halfsize})
+	p3 := center.Add(mgl.Vec3{-halfsize, halfsize, halfsize})
+	p4 := center.Add(mgl.Vec3{halfsize, -halfsize, halfsize})
+	p5 := center.Add(mgl.Vec3{halfsize, -halfsize, -halfsize})
+	p6 := center.Add(mgl.Vec3{-halfsize, -halfsize, -halfsize})
+	p7 := center.Add(mgl.Vec3{-halfsize, -halfsize, halfsize})
+	return []float32{
+		// top face
+		p1[0], p1[1], p1[2],
+		p2[0], p2[1], p2[2],
+		p3[0], p3[1], p3[2],
+		p3[0], p3[1], p3[2],
+		p0[0], p0[1], p0[2],
+		p1[0], p1[1], p1[2],
+
+		// bottom face
+		p4[0], p4[1], p4[2],
+		p7[0], p7[1], p7[2],
+		p6[0], p6[1], p6[2],
+		p6[0], p6[1], p6[2],
+		p5[0], p5[1], p5[2],
+		p4[0], p4[1], p4[2],
+
+		// front face
+		p0[0], p0[1], p0[2],
+		p3[0], p3[1], p3[2],
+		p7[0], p7[1], p7[2],
+		p7[0], p7[1], p7[2],
+		p4[0], p4[1], p4[2],
+		p0[0], p0[1], p0[2],
+
+		// back face
+		p1[0], p1[1], p1[2],
+		p5[0], p5[1], p5[2],
+		p6[0], p6[1], p6[2],
+		p6[0], p6[1], p6[2],
+		p2[0], p2[1], p2[2],
+		p1[0], p1[1], p1[2],
+
+		// left face
+		p2[0], p2[1], p2[2],
+		p6[0], p6[1], p6[2],
+		p7[0], p7[1], p7[2],
+		p7[0], p7[1], p7[2],
+		p3[0], p3[1], p3[2],
+		p2[0], p2[1], p2[2],
+
+		// right face
+		p0[0], p0[1], p0[2],
+		p4[0], p4[1], p4[2],
+		p5[0], p5[1], p5[2],
+		p5[0], p5[1], p5[2],
+		p1[0], p1[1], p1[2],
+		p0[0], p0[1], p0[2],
+	}
 }
