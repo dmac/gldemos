@@ -31,8 +31,9 @@ type BlockBase struct {
 
 type Block struct {
 	BlockBase
-	Pos  mgl.Vec3
-	Size float32
+	Pos   mgl.Vec3
+	Size  float32
+	moved bool
 }
 
 func NewBlock(x, y, z float32) *Block {
@@ -40,21 +41,24 @@ func NewBlock(x, y, z float32) *Block {
 		BlockBase: blockBase,
 		Pos:       mgl.Vec3{x, y, z},
 		Size:      1,
+		moved:     true,
 	}
 	return block
 }
 
 // TODO(dmac) Should only update the uniform when necessary (i.e., after movement)
 func (b *Block) Draw() {
-	model := b.genModel()
-	modelUniform := gl.GetUniformLocation(b.program, gl.Str("model\x00"))
-	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+	if b.moved {
+		model := b.modelMatrix()
+		modelUniform := gl.GetUniformLocation(b.program, gl.Str("model\x00"))
+		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+	}
 	gl.BindVertexArray(b.vao)
 	gl.DrawArrays(gl.TRIANGLES, 0, 36)
 }
 
-// genModel generates a model matrix to be used as a uniform in the shader program.
-func (b *Block) genModel() mgl.Mat4 {
+// modelMatrix generates a model matrix to be used as a uniform in the shader program.
+func (b *Block) modelMatrix() mgl.Mat4 {
 	T := mgl.Translate3D(b.Pos[0], b.Pos[1], b.Pos[2])
 	return T
 }

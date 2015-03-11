@@ -68,18 +68,7 @@ func main() {
 	projUniform := gl.GetUniformLocation(program, gl.Str("proj\x00"))
 	gl.UniformMatrix4fv(projUniform, 1, false, &proj[0])
 
-	camera := mgl.Vec3{0, 1.5, 5}
-	camyaw := float32(0)
-	campitch := float32(0)
-	speed := float32(10)
-	view := viewMatrix(camera, camyaw, campitch)
-	viewUniform := gl.GetUniformLocation(program, gl.Str("view\x00"))
-	gl.UniformMatrix4fv(viewUniform, 1, false, &view[0])
-
-	model := mgl.Ident4()
-	model = model.Mul4(mgl.Translate3D(0, 0, 0))
-	modelUniform := gl.GetUniformLocation(program, gl.Str("model\x00"))
-	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+	camera := NewCamera(0, 1.5, 5, program)
 
 	cx, cy := window.GetCursorPos()
 	lastTime := time.Now().UnixNano()
@@ -90,26 +79,25 @@ func main() {
 		dt := float32(currTime-lastTime) / 1e9
 		lastTime = currTime
 
-		moved := false
 		if window.GetKey(glfw.KeyW) == glfw.Press {
-			camera[0] -= dt * speed * float32(math.Sin(float64(mgl.DegToRad(camyaw))))
-			camera[2] -= dt * speed * float32(math.Cos(float64(mgl.DegToRad(camyaw))))
-			moved = true
+			camera.Pos[0] -= dt * camera.Speed * float32(math.Sin(float64(mgl.DegToRad(camera.Yaw))))
+			camera.Pos[2] -= dt * camera.Speed * float32(math.Cos(float64(mgl.DegToRad(camera.Yaw))))
+			camera.moved = true
 		}
 		if window.GetKey(glfw.KeyS) == glfw.Press {
-			camera[0] += dt * speed * float32(math.Sin(float64(mgl.DegToRad(camyaw))))
-			camera[2] += dt * speed * float32(math.Cos(float64(mgl.DegToRad(camyaw))))
-			moved = true
+			camera.Pos[0] += dt * camera.Speed * float32(math.Sin(float64(mgl.DegToRad(camera.Yaw))))
+			camera.Pos[2] += dt * camera.Speed * float32(math.Cos(float64(mgl.DegToRad(camera.Yaw))))
+			camera.moved = true
 		}
 		if window.GetKey(glfw.KeyA) == glfw.Press {
-			camera[0] -= dt * speed * float32(math.Sin(float64(mgl.DegToRad(camyaw+90))))
-			camera[2] -= dt * speed * float32(math.Cos(float64(mgl.DegToRad(camyaw+90))))
-			moved = true
+			camera.Pos[0] -= dt * camera.Speed * float32(math.Sin(float64(mgl.DegToRad(camera.Yaw+90))))
+			camera.Pos[2] -= dt * camera.Speed * float32(math.Cos(float64(mgl.DegToRad(camera.Yaw+90))))
+			camera.moved = true
 		}
 		if window.GetKey(glfw.KeyD) == glfw.Press {
-			camera[0] += dt * speed * float32(math.Sin(float64(mgl.DegToRad(camyaw+90))))
-			camera[2] += dt * speed * float32(math.Cos(float64(mgl.DegToRad(camyaw+90))))
-			moved = true
+			camera.Pos[0] += dt * camera.Speed * float32(math.Sin(float64(mgl.DegToRad(camera.Yaw+90))))
+			camera.Pos[2] += dt * camera.Speed * float32(math.Cos(float64(mgl.DegToRad(camera.Yaw+90))))
+			camera.moved = true
 		}
 		if window.GetKey(glfw.KeyEscape) == glfw.Press {
 			window.SetShouldClose(true)
@@ -119,26 +107,22 @@ func main() {
 		dcx, dcy := float32(cx2-cx), float32(cy2-cy)
 		if dcx != 0 {
 			cx = cx2
-			camyaw -= dcx * 0.5
-			moved = true
+			camera.Yaw -= dcx * 0.5
+			camera.moved = true
 		}
 		if dcy != 0 {
 			cy = cy2
-			campitch -= dcy * 0.5
-			moved = true
-			if campitch > 90 {
-				campitch = 90
+			camera.Pitch -= dcy * 0.5
+			camera.moved = true
+			if camera.Pitch > 90 {
+				camera.Pitch = 90
 			}
-			if campitch < -90 {
-				campitch = -90
+			if camera.Pitch < -90 {
+				camera.Pitch = -90
 			}
 		}
 
-		if moved {
-			view := viewMatrix(camera, camyaw, campitch)
-			gl.UniformMatrix4fv(viewUniform, 1, false, &view[0])
-		}
-
+		camera.Draw()
 		for _, block := range blocks {
 			block.Draw()
 		}
@@ -146,12 +130,6 @@ func main() {
 		window.SwapBuffers()
 		glfw.PollEvents()
 	}
-}
-
-func viewMatrix(camera [3]float32, yaw float32, pitch float32) mgl.Mat4 {
-	R := mgl.Rotate3DX(mgl.DegToRad(-pitch)).Mul3(mgl.Rotate3DY(mgl.DegToRad(-yaw))).Mat4()
-	T := mgl.Translate3D(-camera[0], -camera[1], -camera[2])
-	return R.Mul4(T)
 }
 
 func linkProgram(vertexShaderFilename, fragmentShaderFilename string) (uint32, error) {
