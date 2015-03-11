@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"math"
 	"runtime"
 	"strings"
 	"time"
@@ -80,24 +79,16 @@ func main() {
 		lastTime = currTime
 
 		if window.GetKey(glfw.KeyW) == glfw.Press {
-			camera.Pos[0] -= dt * camera.Speed * float32(math.Sin(float64(mgl.DegToRad(camera.Yaw))))
-			camera.Pos[2] -= dt * camera.Speed * float32(math.Cos(float64(mgl.DegToRad(camera.Yaw))))
-			camera.moved = true
+			camera.MoveForward(dt)
 		}
 		if window.GetKey(glfw.KeyS) == glfw.Press {
-			camera.Pos[0] += dt * camera.Speed * float32(math.Sin(float64(mgl.DegToRad(camera.Yaw))))
-			camera.Pos[2] += dt * camera.Speed * float32(math.Cos(float64(mgl.DegToRad(camera.Yaw))))
-			camera.moved = true
+			camera.MoveBackward(dt)
 		}
 		if window.GetKey(glfw.KeyA) == glfw.Press {
-			camera.Pos[0] -= dt * camera.Speed * float32(math.Sin(float64(mgl.DegToRad(camera.Yaw+90))))
-			camera.Pos[2] -= dt * camera.Speed * float32(math.Cos(float64(mgl.DegToRad(camera.Yaw+90))))
-			camera.moved = true
+			camera.MoveLeft(dt)
 		}
 		if window.GetKey(glfw.KeyD) == glfw.Press {
-			camera.Pos[0] += dt * camera.Speed * float32(math.Sin(float64(mgl.DegToRad(camera.Yaw+90))))
-			camera.Pos[2] += dt * camera.Speed * float32(math.Cos(float64(mgl.DegToRad(camera.Yaw+90))))
-			camera.moved = true
+			camera.MoveRight(dt)
 		}
 		if window.GetKey(glfw.KeyEscape) == glfw.Press {
 			window.SetShouldClose(true)
@@ -122,6 +113,7 @@ func main() {
 			}
 		}
 
+		camera.Update(dt)
 		camera.Draw()
 		for _, block := range blocks {
 			block.Draw()
