@@ -5,12 +5,12 @@ import (
 	mgl "github.com/go-gl/mathgl/mgl32"
 )
 
-var blockBase BlockBase
+var blockSpec BlockSpec
 
-func initBlockBase(program uint32) {
-	blockBase = BlockBase{0, program}
-	gl.GenVertexArrays(1, &blockBase.vao)
-	gl.BindVertexArray(blockBase.vao)
+func initBlockSpec(program uint32) {
+	blockSpec = BlockSpec{0, program}
+	gl.GenVertexArrays(1, &blockSpec.vao)
+	gl.BindVertexArray(blockSpec.vao)
 
 	var vbo uint32
 	gl.GenBuffers(1, &vbo)
@@ -24,13 +24,13 @@ func initBlockBase(program uint32) {
 	gl.VertexAttribPointer(vattrib, 3, gl.FLOAT, false, 3*4, gl.PtrOffset(0))
 }
 
-type BlockBase struct {
+type BlockSpec struct {
 	vao     uint32
 	program uint32
 }
 
 type Block struct {
-	BlockBase
+	BlockSpec
 	Pos   mgl.Vec3
 	Size  float32
 	moved bool
@@ -38,7 +38,7 @@ type Block struct {
 
 func NewBlock(x, y, z float32) *Block {
 	block := &Block{
-		BlockBase: blockBase,
+		BlockSpec: blockSpec,
 		Pos:       mgl.Vec3{x, y, z},
 		Size:      1,
 		moved:     true,

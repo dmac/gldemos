@@ -54,7 +54,7 @@ func main() {
 		panic(err)
 	}
 	gl.UseProgram(program)
-	initBlockBase(program)
+	initBlockSpec(program)
 
 	blocks := []*Block{
 		NewBlock(0, 0, 0),
