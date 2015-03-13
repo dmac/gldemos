@@ -16,7 +16,7 @@ func initBlockSpec(program uint32) {
 	gl.GenBuffers(1, &vbo)
 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
 
-	mesh := genBlockVertexData(mgl.Vec3{0, 0, 0}, 1)
+	mesh := genBlockMesh()
 	gl.BufferData(gl.ARRAY_BUFFER, len(mesh)*4, gl.Ptr(mesh), gl.STATIC_DRAW)
 
 	vattrib := uint32(gl.GetAttribLocation(program, gl.Str("vertex_position\x00")))
@@ -31,8 +31,10 @@ type BlockSpec struct {
 
 type Block struct {
 	BlockSpec
-	Pos  mgl.Vec3
-	Size float32
+	Pos   mgl.Vec3
+	Size  float32
+	Pitch float32
+	Yaw   float32
 }
 
 func NewBlock(x, y, z float32) *Block {
@@ -40,6 +42,8 @@ func NewBlock(x, y, z float32) *Block {
 		BlockSpec: blockSpec,
 		Pos:       mgl.Vec3{x, y, z},
 		Size:      1,
+		Pitch:     45,
+		Yaw:       45,
 	}
 	return block
 }
@@ -55,21 +59,22 @@ func (b *Block) Draw() {
 
 // modelMatrix generates a model matrix to be used as a uniform in the shader program.
 func (b *Block) modelMatrix() mgl.Mat4 {
-	T := mgl.Translate3D(b.Pos[0], b.Pos[1], b.Pos[2])
-	return T
+	S := mgl.Ident3().Mul(b.Size).Mat4()
+	T := mgl.Translate3D(b.Pos[0], b.Pos[1], b.Pos[2]).Mul(b.Size)
+	R := mgl.Rotate3DX(mgl.DegToRad(b.Pitch)).Mul3(mgl.Rotate3DY(mgl.DegToRad(b.Yaw))).Mat4()
+	return T.Mul4(R).Mul4(S)
 }
 
-// genVertexData takes an array of points and returns a "mesh" of the block for use in glBufferData.
-func genBlockVertexData(center mgl.Vec3, size float32) []float32 {
-	halfsize := size / 2
-	p0 := center.Add(mgl.Vec3{halfsize, halfsize, halfsize})
-	p1 := center.Add(mgl.Vec3{halfsize, halfsize, -halfsize})
-	p2 := center.Add(mgl.Vec3{-halfsize, halfsize, -halfsize})
-	p3 := center.Add(mgl.Vec3{-halfsize, halfsize, halfsize})
-	p4 := center.Add(mgl.Vec3{halfsize, -halfsize, halfsize})
-	p5 := center.Add(mgl.Vec3{halfsize, -halfsize, -halfsize})
-	p6 := center.Add(mgl.Vec3{-halfsize, -halfsize, -halfsize})
-	p7 := center.Add(mgl.Vec3{-halfsize, -halfsize, halfsize})
+// genBlockMesh takes an array of points and returns a "mesh" of the block for use in glBufferData.
+func genBlockMesh() []float32 {
+	p0 := mgl.Vec3{0.5, 0.5, 0.5}
+	p1 := mgl.Vec3{0.5, 0.5, -0.5}
+	p2 := mgl.Vec3{-0.5, 0.5, -0.5}
+	p3 := mgl.Vec3{-0.5, 0.5, 0.5}
+	p4 := mgl.Vec3{0.5, -0.5, 0.5}
+	p5 := mgl.Vec3{0.5, -0.5, -0.5}
+	p6 := mgl.Vec3{-0.5, -0.5, -0.5}
+	p7 := mgl.Vec3{-0.5, -0.5, 0.5}
 	return []float32{
 		// top face
 		p1[0], p1[1], p1[2],
