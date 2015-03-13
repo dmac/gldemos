@@ -31,9 +31,8 @@ type BlockSpec struct {
 
 type Block struct {
 	BlockSpec
-	Pos   mgl.Vec3
-	Size  float32
-	moved bool
+	Pos  mgl.Vec3
+	Size float32
 }
 
 func NewBlock(x, y, z float32) *Block {
@@ -41,18 +40,15 @@ func NewBlock(x, y, z float32) *Block {
 		BlockSpec: blockSpec,
 		Pos:       mgl.Vec3{x, y, z},
 		Size:      1,
-		moved:     true,
 	}
 	return block
 }
 
 // TODO(dmac) Should only update the uniform when necessary (i.e., after movement)
 func (b *Block) Draw() {
-	if b.moved {
-		model := b.modelMatrix()
-		modelUniform := gl.GetUniformLocation(b.program, gl.Str("model\x00"))
-		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
-	}
+	model := b.modelMatrix()
+	modelUniform := gl.GetUniformLocation(b.program, gl.Str("model\x00"))
+	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 	gl.BindVertexArray(b.vao)
 	gl.DrawArrays(gl.TRIANGLES, 0, 36)
 }
